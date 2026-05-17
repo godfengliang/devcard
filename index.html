@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevCard — Beautiful GitHub Profile Cards</title>
+<meta name="description" content="Generate beautiful, shareable developer profile cards from your GitHub username. Customize themes, download as PNG. Free, instant, no signup.">
+<meta name="keywords" content="github card, developer card, profile card, dev card, github stats, developer profile">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://devcard-tool.surge.sh/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="DevCard — Beautiful GitHub Profile Cards">
+<meta property="og:description" content="Generate shareable developer cards from your GitHub profile. Free, instant, no signup.">
+<meta property="og:url" content="https://devcard-tool.surge.sh/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="DevCard — Beautiful GitHub Profile Cards">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DevCard","applicationCategory":"DeveloperApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Generate beautiful developer profile cards from GitHub profiles."}</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+header{padding:24px 20px 8px;text-align:center;width:100%}
+header h1{font-size:26px;font-weight:800;letter-spacing:-.5px}
+header h1 span{color:#58a6ff}
+header p{font-size:13px;color:#8b949e;margin-top:4px}
+.input-row{display:flex;gap:8px;margin:16px 0;width:100%;max-width:680px;padding:0 20px}
+.input-row input{flex:1;background:#161b22;border:1px solid #30363d;color:#c9d1d9;padding:10px 14px;border-radius:8px;font-size:14px;outline:none;font-family:inherit}
+.input-row input:focus{border-color:#58a6ff}
+.btn{padding:10px 20px;border-radius:8px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-primary{background:#238636;color:#fff}
+.btn-primary:hover{background:#2ea043}
+.btn-primary:disabled{background:#21262d;color:#484f58;cursor:not-allowed}
+.error-msg{color:#f85149;font-size:13px;margin:4px 0 8px;display:none;padding:0 20px;max-width:680px;width:100%}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:8px 0 16px;align-items:center}
+.controls label{font-size:12px;color:#8b949e;margin-right:4px}
+.theme-btn{width:32px;height:32px;border-radius:50%;border:3px solid #21262d;cursor:pointer;transition:border-color .2s,transform .15s}
+.theme-btn:hover{transform:scale(1.15)}
+.theme-btn.active{border-color:#58a6ff}
+.canvas-wrap{margin:0 0 12px;position:relative}
+canvas{border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:calc(100% - 40px);height:auto;display:block;margin:0 auto}
+.actions{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;justify-content:center}
+.btn-dl{background:#1f6feb;color:#fff}
+.btn-dl:hover{background:#388bfd}
+.btn-cp{background:#21262d;color:#c9d1d9;border:1px solid #30363d}
+.btn-cp:hover{background:#30363d}
+.tip{font-size:11px;color:#484f58;text-align:center;margin:4px 0 0;max-width:640px;padding:0 20px}
+footer{margin-top:auto;padding:20px;text-align:center;font-size:12px;color:#484f58}
+footer a{color:#58a6ff;text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Dev<span>Card</span></h1>
+  <p>Generate a beautiful profile card from any GitHub account</p>
+</header>
+<div class="input-row">
+  <input type="text" id="username" placeholder="Enter GitHub username..." autocomplete="off" spellcheck="false">
+  <button class="btn btn-primary" id="btnGen">Generate</button>
+</div>
+<div class="error-msg" id="err"></div>
+<div class="controls">
+  <label>Theme:</label>
+  <button class="theme-btn active" data-theme="dark" style="background:#0d1117" title="Dark"></button>
+  <button class="theme-btn" data-theme="midnight" style="background:linear-gradient(135deg,#1a1a2e,#16213e)" title="Midnight"></button>
+  <button class="theme-btn" data-theme="gradient" style="background:linear-gradient(135deg,#667eea,#764ba2)" title="Purple Gradient"></button>
+  <button class="theme-btn" data-theme="sunset" style="background:linear-gradient(135deg,#f093fb,#f5576c)" title="Sunset"></button>
+  <button class="theme-btn" data-theme="forest" style="background:linear-gradient(135deg,#0ba360,#3cba92)" title="Forest"></button>
+  <button class="theme-btn" data-theme="ocean" style="background:linear-gradient(135deg,#0052d4,#4364f7)" title="Ocean"></button>
+</div>
+<div class="canvas-wrap">
+  <canvas id="card"></canvas>
+</div>
+<div class="actions">
+  <button class="btn btn-dl" id="btnDl">Download PNG</button>
+  <button class="btn btn-cp" id="btnCp">Copy Image</button>
+</div>
+<p class="tip">Paste a username and press Enter. Uses GitHub Public API (60 req/hr). No data leaves your browser.</p>
+<footer>Powered by <a href="https://docs.github.com/en/rest">GitHub REST API</a> &bull; No tracking &bull; <a href="https://github.com/godfengliang/devcard">Source on GitHub</a></footer>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const W=640,H=360,DPR=2;
+const canvas=$('card');
+canvas.width=W*DPR;canvas.height=H*DPR;
+canvas.style.width=W+'px';canvas.style.height=H+'px';
+const ctx=canvas.getContext('2d');
+ctx.scale(DPR,DPR);
+
+const THEMES={
+  dark:{
+    bg:'#0d1117',card:'#161b22',text:'#c9d1d9',name:'#e6edf3',
+    muted:'#8b949e',accent:'#58a6ff',border:'#30363d',barBg:'#21262d',
+    grad:null
+  },
+  midnight:{
+    bg:'#1a1a2e',card:'#16213e',text:'#e2e8f0',name:'#ffffff',
+    muted:'#94a3b8',accent:'#818cf8',border:'#334155',barBg:'#1e293b',
+    grad:null
+  },
+  gradient:{
+    bg:null,card:'rgba(255,255,255,0.07)',text:'#e2e8f0',name:'#ffffff',
+    muted:'#c4b5fd',accent:'#a78bfa',border:'rgba(255,255,255,0.12)',barBg:'rgba(255,255,255,0.08)',
+    grad:['#667eea','#764ba2']
+  },
+  sunset:{
+    bg:null,card:'rgba(0,0,0,0.15)',text:'#fef3c7',name:'#ffffff',
+    muted:'#fde68a',accent:'#fb923c',border:'rgba(255,255,255,0.12)',barBg:'rgba(0,0,0,0.15)',
+    grad:['#f093fb','#f5576c']
+  },
+  forest:{
+    bg:null,card:'rgba(0,0,0,0.12)',text:'#d1fae5',name:'#ffffff',
+    muted:'#6ee7b7',accent:'#34d399',border:'rgba(255,255,255,0.12)',barBg:'rgba(0,0,0,0.12)',
+    grad:['#0ba360','#3cba92']
+  },
+  ocean:{
+    bg:null,card:'rgba(0,0,0,0.12)',text:'#dbeafe',name:'#ffffff',
+    muted:'#93c5fd',accent:'#60a5fa',border:'rgba(255,255,255,0.12)',barBg:'rgba(0,0,0,0.12)',
+    grad:['#0052d4','#4364f7']
+  }
+};
+
+const LANG_COLORS={
+  'JavaScript':'#f1e05a','Python':'#3572A5','TypeScript':'#3178c6',
+  'Java':'#b07219','C++':'#f34b7d','C':'#555555','C#':'#178600',
+  'Go':'#00ADD8','Rust':'#dea584','Ruby':'#701516','PHP':'#4F5D95',
+  'Swift':'#F05138','Kotlin':'#A97BFF','Dart':'#00B4AB','Scala':'#c22d40',
+  'Shell':'#89e051','HTML':'#e34c26','CSS':'#563d7c','Vue':'#41b883',
+  'Lua':'#000080','R':'#198CE7','Perl':'#0298c3','Haskell':'#29b544',
+  'Elixir':'#6e4a7e','Clojure':'#db5855','Zig':'#ec915c','Nim':'#FFE953'
+};
+
+let curTheme='dark',curData=null,avatarImg=null;
+
+function rr(x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
+function fmt(n){
+  if(n>=1e6)return(n/1e6).toFixed(1)+'M';
+  if(n>=1e3)return(n/1e3).toFixed(1)+'K';
+  return String(n);
+}
+
+function loadImg(url){
+  return new Promise((ok,no)=>{
+    const img=new Image();img.crossOrigin='anonymous';
+    img.onload=()=>ok(img);img.onerror=()=>no();
+    img.src=url;
+  });
+}
+
+async function fetchUser(u){
+  const r=await fetch('https://api.github.com/users/'+u);
+  if(!r.ok){if(r.status===404)throw new Error('User "'+u+'" not found');if(r.status===403)throw new Error('API rate limit hit. Wait a minute and try again.');throw new Error('API error '+r.status);}
+  return r.json();
+}
+async function fetchRepos(u){
+  const r=await fetch('https://api.github.com/users/'+u+'/repos?per_page=100&sort=pushed');
+  if(!r.ok)return[];
+  return r.json();
+}
+
+function procLangs(repos){
+  const m={};
+  repos.forEach(r=>{if(r.language)m[r.language]=(m[r.language]||0)+1;});
+  const t=Object.values(m).reduce((a,b)=>a+b,0)||1;
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([l,c])=>({lang:l,count:c,pct:Math.round(c/t*100)}));
+}
+
+function draw(data,theme,av){
+  const t=THEMES[theme];
+  ctx.clearRect(0,0,W,H);
+
+  // Outer bg
+  if(t.grad){
+    const g=ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,t.grad[0]);g.addColorStop(1,t.grad[1]);ctx.fillStyle=g;
+  }else{ctx.fillStyle=t.bg;}
+  rr(0,0,W,H,16);ctx.fill();
+
+  // Inner card
+  const p=14;
+  ctx.fillStyle=t.card;rr(p,p,W-p*2,H-p*2,12);ctx.fill();
+  ctx.strokeStyle=t.border;ctx.lineWidth=1;rr(p,p,W-p*2,H-p*2,12);ctx.stroke();
+
+  const x0=p+20,y0=p+22,u=data.user;
+
+  // Avatar
+  const ar=30,acx=x0+ar,acy=y0+ar+2;
+  if(av){
+    ctx.save();ctx.beginPath();ctx.arc(acx,acy,ar,0,Math.PI*2);ctx.clip();
+    ctx.drawImage(av,acx-ar,acy-ar,ar*2,ar*2);ctx.restore();
+    ctx.beginPath();ctx.arc(acx,acy,ar,0,Math.PI*2);ctx.strokeStyle=t.accent;ctx.lineWidth=2.5;ctx.stroke();
+  }else{
+    ctx.beginPath();ctx.arc(acx,acy,ar,0,Math.PI*2);ctx.fillStyle=t.barBg;ctx.fill();
+    ctx.fillStyle=t.muted;ctx.font='bold 22px -apple-system,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText((u.name||u.login)[0].toUpperCase(),acx,acy);ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  }
+
+  // Name + login + bio
+  const tx=acx+ar+14;
+  ctx.fillStyle=t.name;ctx.font='bold 19px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+  const dn=(u.name||u.login);ctx.fillText(dn.length>26?dn.slice(0,23)+'...':dn,tx,y0+12);
+  ctx.fillStyle=t.muted;ctx.font='12px -apple-system,sans-serif';ctx.fillText('@'+u.login,tx,y0+28);
+  if(u.bio){ctx.fillStyle=t.text;ctx.font='12px -apple-system,sans-serif';
+    const b=u.bio.length>75?u.bio.slice(0,72)+'...':u.bio;ctx.fillText(b,tx,y0+46);}
+
+  // Stats
+  const sy=y0+ar*2+32;
+  const stars=data.repos.reduce((s,r)=>s+(r.stargazers_count||0),0);
+  const forks=data.repos.reduce((s,r)=>s+(r.forks_count||0),0);
+  const stats=[
+    {l:'Repos',v:u.public_repos},{l:'Stars',v:stars},
+    {l:'Followers',v:u.followers},{l:'Forks',v:forks}
+  ];
+  const sx0=p+22,ssp=152;
+  stats.forEach((s,i)=>{
+    const x=sx0+i*ssp;
+    ctx.fillStyle=t.muted;ctx.font='11px -apple-system,sans-serif';ctx.fillText(s.l,x,sy);
+    ctx.fillStyle=t.name;ctx.font='bold 18px -apple-system,sans-serif';ctx.fillText(fmt(s.v),x,sy+20);
+  });
+
+  // Languages
+  if(data.langs.length){
+    const ly=sy+44;
+    ctx.fillStyle=t.muted;ctx.font='bold 10px -apple-system,sans-serif';ctx.fillText('TOP LANGUAGES',sx0,ly);
+    data.langs.forEach((l,i)=>{
+      const y=ly+18+i*20;
+      ctx.fillStyle=t.text;ctx.font='12px -apple-system,sans-serif';ctx.fillText(l.lang,sx0,y);
+      const bx=sx0+88,bw=390,bh=8;
+      ctx.fillStyle=t.barBg;rr(bx,y-8,bw,bh,4);ctx.fill();
+      ctx.fillStyle=LANG_COLORS[l.lang]||t.accent;
+      const fw=Math.max(bw*l.pct/100,6);rr(bx,y-8,fw,bh,4);ctx.fill();
+      ctx.fillStyle=t.muted;ctx.font='11px -apple-system,sans-serif';ctx.fillText(l.pct+'%',bx+bw+8,y);
+    });
+  }
+
+  // Footer
+  const fy=H-p-10;
+  ctx.fillStyle=t.muted;ctx.font='10px -apple-system,sans-serif';
+  const since=new Date(u.created_at).getFullYear();
+  ctx.fillText('Since '+since+'  •  github.com/'+u.login,sx0,fy);
+  ctx.textAlign='right';ctx.fillStyle=t.muted;ctx.font='10px -apple-system,sans-serif';
+  ctx.fillText('DevCard',W-p-18,fy);ctx.textAlign='left';
+}
+
+function showSample(){
+  draw({
+    user:{login:'octocat',name:'The Octocat',bio:'GitHub mascot and demo user. Generating cards since day one.',public_repos:8,followers:12400,following:9,created_at:'2011-01-25T18:44:36Z'},
+    repos:[{language:'JavaScript',stargazers_count:5800,forks_count:420},{language:'Ruby',stargazers_count:2100,forks_count:380},{language:'Python',stargazers_count:1500,forks_count:210},{language:'Go',stargazers_count:450,forks_count:67}],
+    langs:[{lang:'JavaScript',pct:40},{lang:'Ruby',pct:20},{lang:'Python',pct:20},{lang:'Go',pct:20}]
+  },curTheme,null);
+}
+
+async function generate(un){
+  $('btnGen').disabled=true;$('err').style.display='none';
+  const t=THEMES[curTheme];
+  ctx.clearRect(0,0,W,H);
+  if(t.grad){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,t.grad[0]);g.addColorStop(1,t.grad[1]);ctx.fillStyle=g;}
+  else ctx.fillStyle=t.bg;
+  rr(0,0,W,H,16);ctx.fill();
+  ctx.fillStyle=t.muted;ctx.font='14px -apple-system,sans-serif';ctx.textAlign='center';
+  ctx.fillText('Fetching profile...',W/2,H/2);ctx.textAlign='left';
+
+  try{
+    const [user,repos]=await Promise.all([fetchUser(un),fetchRepos(un)]);
+    const langs=procLangs(repos);
+    curData={user,repos,langs};
+    try{avatarImg=await loadImg(user.avatar_url);}catch(e){avatarImg=null;}
+    draw(curData,curTheme,avatarImg);
+  }catch(e){
+    $('err').textContent=e.message;$('err').style.display='block';showSample();
+  }
+  $('btnGen').disabled=false;
+}
+
+$('btnGen').addEventListener('click',()=>{const u=$('username').value.trim();if(u)generate(u);});
+$('username').addEventListener('keydown',e=>{if(e.key==='Enter'){const u=$('username').value.trim();if(u)generate(u);}});
+
+document.querySelectorAll('.theme-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelector('.theme-btn.active')?.classList.remove('active');
+    b.classList.add('active');curTheme=b.dataset.theme;
+    if(curData)draw(curData,curTheme,avatarImg);else showSample();
+  });
+});
+
+$('btnDl').addEventListener('click',()=>{
+  const a=document.createElement('a');a.download='devcard-'+(curData?curData.user.login:'sample')+'.png';
+  a.href=canvas.toDataURL('image/png');a.click();
+});
+
+$('btnCp').addEventListener('click',()=>{
+  canvas.toBlob(b=>{
+    if(b&&navigator.clipboard?.write){
+      navigator.clipboard.write([new ClipboardItem({'image/png':b})]).then(()=>alert('Card copied!')).catch(()=>alert('Copy failed — try Download'));
+    }else alert('Not supported in this browser — use Download');
+  },'image/png');
+});
+
+showSample();
+})();
+</script>
+</body>
+</html>
